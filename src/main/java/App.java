@@ -9,6 +9,28 @@ public class App {
     public static void main(String[] args) throws InterruptedException {
         int size = 1000;
         List<Thread> threadList = new ArrayList<>();
+        Thread maxViewer = new Thread(() -> {
+            synchronized (sizeToFreq) {
+                int oldSize = 0;
+                while (!Thread.interrupted()) {
+                    if (!sizeToFreq.isEmpty() && oldSize != sizeToFreq.size()) {
+                        Map.Entry<Integer, Integer> max = sizeToFreq.entrySet().stream().max((entry1, entry2) -> entry1.getValue() > entry2.getValue() ? 1 : -1).get();
+                        System.out.println("Максимальное значение на текущий момент: \n\tКоличество повторений " + max.getKey() + " встретилось " + max.getValue() + " раз");
+                        oldSize = sizeToFreq.size();
+                    }
+                    else {
+                        try {
+                            sizeToFreq.wait();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                }
+                System.out.println("Поток вывода максимума прерван");
+            }
+        });
+
+        maxViewer.start();
 
         for (int i = 0; i < size; i++) {
             Thread thread = new Thread(() -> {
@@ -24,6 +46,7 @@ public class App {
                         value = 1;
                         sizeToFreq.put(count, value);
                     }
+                    sizeToFreq.notify();
                 }
             });
             threadList.add(thread);
@@ -33,6 +56,8 @@ public class App {
         for (Thread thread : threadList) {
             thread.join();
         }
+
+        maxViewer.interrupt();
 
         //Находим максимальное
         Map.Entry<Integer, Integer> max = sizeToFreq.entrySet().stream().max((entry1, entry2) -> entry1.getValue() > entry2.getValue() ? 1 : -1).get();
